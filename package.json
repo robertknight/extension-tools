@@ -1,6 +1,6 @@
 {
   "name": "extension-tools",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A collection of tools for automated publishing of browser extensions",
   "main": "exec.js",
   "scripts": {
@@ -8,8 +8,8 @@
   },
   "bin": {
     "jsonfmt": "./src/jsonfmt.js",
-	"publish-chrome-extension": "./src/publish-chrome-extension.js",
-	"update-manifest-version": "./src/update-manifest-version.js"
+    "publish-chrome-extension": "./src/publish-chrome-extension.js",
+    "update-manifest-version": "./src/update-manifest-version.js"
   },
   "repository": {
     "type": "git",
@@ -19,17 +19,23 @@
     "chrome",
     "browser",
     "extensions",
-    "firefox"
+    "firefox",
+    "chrome web store"
   ],
   "author": "Robert Knight <robertknight@gmail.com>",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/robertknight/extension-tools/issues"
   },
   "homepage": "https://github.com/robertknight/extension-tools",
   "dependencies": {
+    "commander": "^2.8.1",
     "q": "^1.4.1",
     "request": "^2.58.0",
     "sprintf": "^0.1.5"
+  },
+  "devDependencies": {
+    "chai": "^3.0.0",
+    "mocha": "^2.2.5"
   }
 }

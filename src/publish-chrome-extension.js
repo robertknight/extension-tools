@@ -1,32 +1,49 @@
 #!/usr/bin/env node
 
-// Utility script to publish a Google Chrome extension to the Chrome Web Store
-// following a successful Travis CI build.
+'use strict';
+
+// Utility script to publish a Google Chrome extension to the Chrome Web Store.
 //
-// Usage:
-//   export CHROME_EXT_CLIENT_ID=<ID>
-//   export CHROME_EXT_CLIENT_SECRET=<secret>
-//   export CHROME_EXT_REFRESH_TOKEN=<token>
-//   export CHROME_EXT_APP_ID=<ID>
-//
-//   publish-chrome-extension.js <path/to/package.zip>
-//
-// This uses the APIs described at https://developer.chrome.com/webstore/using_webstore_api
+// This uses the Chrome Web Store APIs described at https://developer.chrome.com/webstore/using_webstore_api
 // to upload a new .zip archive containing the extension's files to the Chrome Web Store
 // and then publish the new version.
 //
-// This script is intended for use from within a Travis CI environment and by default
-// exits if not building a non-pull request on the master branch.
+// Usage:
+// 
+//   1. Use the Chrome Web Store dashboard to publish the first version
+//      of your extension and get its ID
 //
-// Access to the web store APIs requires an access token as described at
-// https://developer.chrome.com/webstore/using_webstore_api . To obtain an access
-// token this script needs:
+//   2. Follow the instructions at https://developer.chrome.com/webstore/using_webstore_api to
+//      obtain access credentials for the Chrome Web Store API.
 //
-//  - A client ID and secret, exposed via CHROME_EXT_CLIENT_ID and CHROME_EXT_CLIENT_SECRET
-//  - A client refresh token, exposed via CHROME_EXT_REFRESH_TOKEN
+//      You'll need a client ID, client secret and refresh token.
 //
-// Additionally the script needs the app ID of the Chrome extension, which it gets
-// from the CHROME_EXT_APP_ID env var
+//   3. Create a config file specifying the extension ID and the
+//      OAuth keys:
+//
+//   {
+//   	"client_id" : "<client ID>",
+//   	"client_secret" : "<client secret>",
+//   	"refresh_token" : "<refresh token>",
+//   	"app_id" : "<ID>"
+//   }
+//
+//   4. Run 'publish-chrome-extension.js <path/to/config.js> <path/to/package.zip>'
+//   
+//     publish-chrome-extension.js <path/to/package.zip>
+//
+// # Usage in Travis CI
+//
+// When publishing from a Travis CI build, this script can be configured to only
+// publish the extension if building from a specific branch (eg. 'master')
+//
+var commander = require('commander');
+var fs = require('fs');
+var request = require('request');
+var sprintf = require('sprintf');
+var encryptObject = require('./encrypt-object');
+
+var GOOGLE_OAUTH_TOKEN_ENDPOINT = 'https://accounts.google.com/o/oauth2/token';
 
 function requireEnvVar(name) {
 	var val = process.env[name];
@@ -36,29 +53,57 @@ function requireEnvVar(name) {
 	return val;
 }
 
-var fs = require('fs');
-var request = require('request');
-var sprintf = require('sprintf');
+function requireKey(obj, key) {
+	if (!obj[key]) {
+		throw new Error('Required key \'%s\' not found in config');
+	}
+	return obj[key];
+}
 
 function main(args) {
-	var travisBranch = requireEnvVar('TRAVIS_BRANCH');
-	var travisPullRequest = requireEnvVar('TRAVIS_PULL_REQUEST');
+	var configPath;
+	var packagePath;
 
-	var appId = requireEnvVar('CHROME_EXT_APP_ID');
-	var packageUploadEndpoint = 'https://www.googleapis.com/upload/chromewebstore/v1.1/items/' + appId;
-	var packagePublishEndpoint = 'https://www.googleapis.com/chromewebstore/v1.1/items/' + appId + '/publish';
-	var packagePath = args[0];
+	commander
+	  .description('Upload a Chrome extension to the Chrome Web Store')
+	  .usage('[options] <config file> <package path>')
+	  .option('--require-travis-branch [branch]', 'For Travis CI builds, only publish when building from [branch]')
+	  .option('-p, --passphrase-var [VAR]', 'Read encryption passphrase for the config file from the environment variable VAR')
+	  .action(function(_configPath, _packagePath) {
+		  configPath = _configPath;
+		  packagePath = _packagePath;
+	  });
+	commander.parse(args);
+
 	if (!packagePath) {
 		throw new Error('Package path not specified');
 	}
+	if (!configPath) {
+		throw new Error('Config path not specified');
+	}
 
-	var clientId = requireEnvVar('CHROME_EXT_CLIENT_ID');
-	var clientSecret = requireEnvVar('CHROME_EXT_CLIENT_SECRET');
-	var refreshToken = requireEnvVar('CHROME_EXT_REFRESH_TOKEN');
+	var config = JSON.parse(fs.readFileSync(configPath));
+	if (commander.passphraseVar) {
+		var passphrase = requireEnvVar(commander.passphraseVar);
+		config = encryptObject.decryptObject(config, passphrase, encryptObject.DEFAULT_ITERATIONS);
+	}
 
-	if (travisBranch !== 'master' || travisPullRequest !== 'false') {
-		console.log('Skipping publication from pull request or non-master branch');
-		return;
+	var appId = requireKey(config, 'app_id');
+	var clientId = requireKey(config, 'client_id');
+	var clientSecret = requireKey(config, 'client_secret');
+	var refreshToken = requireKey(config, 'refresh_token');
+
+	var packageUploadEndpoint = 'https://www.googleapis.com/upload/chromewebstore/v1.1/items/' + appId;
+	var packagePublishEndpoint = 'https://www.googleapis.com/chromewebstore/v1.1/items/' + appId + '/publish';
+
+	if (commander.requireTravisBranch) {
+		var travisBranch = requireEnvVar('TRAVIS_BRANCH');
+		var travisPullRequest = requireEnvVar('TRAVIS_PULL_REQUEST');
+		if (travisBranch !== commander.requireTravisBranch || travisPullRequest !== 'false') {
+			console.log('Current branch \'%s\' does not match \'%s\'. Skipping upload.',
+			  travisBranch, commander.requireTravisBranch);
+			return;
+		}
 	}
 
 	var accessTokenParams = {
@@ -69,7 +114,7 @@ function main(args) {
 	};
 
 	console.log('Refreshing Chrome Web Store access token...');
-	request.post('https://accounts.google.com/o/oauth2/token',
+	request.post(GOOGLE_OAUTH_TOKEN_ENDPOINT,
 				 {form : accessTokenParams},
 				 function(err, response, body) {
 		if (err || response.statusCode !== 200) {
@@ -83,6 +128,10 @@ function main(args) {
 		}, function(err, response, body) {
 			if (err || response.statusCode !== 200) {
 				throw new Error(sprintf('Package upload failed: %d %s', response.statusCode, body));
+			}
+			var uploadResult = JSON.parse(body);
+			if (uploadResult.uploadState == 'FAILURE') {
+				throw new Error(sprintf('Package upload error: %s', JSON.stringify(uploadResult)));
 			}
 
 			console.log('Publishing updated package', appId);
@@ -101,13 +150,13 @@ function main(args) {
 }
 
 var onErr = function(err) {
-	console.log('Publishing to Chrome Web Store failed:', err.message);
+	console.error('Publishing to Chrome Web Store failed:', err.message, err.stack);
 	process.exit(1);
 };
 process.on('uncaughtException', onErr);
 
 try {
-	main(process.argv.slice(2));
+	main(process.argv);
 } catch (err) {
 	onErr(err);
 }

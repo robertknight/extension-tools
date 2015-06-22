@@ -1,5 +1,7 @@
 # Browser Extension Tools
 
+[![Build Status](https://travis-ci.org/robertknight/extension-tools.png?branch=master)](https://travis-ci.org/robertknight/extension-tools)
+
 A collection of scripts for automated packaging and deployment
 of browser extensions.
 
