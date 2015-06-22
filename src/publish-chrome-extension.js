@@ -42,6 +42,7 @@ var fs = require('fs');
 var request = require('request');
 var sprintf = require('sprintf');
 var encryptObject = require('./encrypt-object');
+var Q = require('q');
 
 var GOOGLE_OAUTH_TOKEN_ENDPOINT = 'https://accounts.google.com/o/oauth2/token';
 
@@ -58,6 +59,25 @@ function requireKey(obj, key) {
 		throw new Error('Required key \'%s\' not found in config');
 	}
 	return obj[key];
+}
+
+function uploadPackage(packagePath, appId, accessToken) {
+	var uploaded = Q.defer();
+	var packageUploadEndpoint = 'https://www.googleapis.com/upload/chromewebstore/v1.1/items/' + appId;
+	fs.createReadStream(packagePath).pipe(request.put(packageUploadEndpoint, {
+		auth: { bearer: accessToken }
+	}, uploaded.makeNodeResolver()));
+	return uploaded.promise;
+}
+
+function publishPackage(appId, accessToken) {
+	var published = Q.defer();
+	var packagePublishEndpoint = 'https://www.googleapis.com/chromewebstore/v1.1/items/' + appId + '/publish';
+	request.post(packagePublishEndpoint,{
+		auth: { bearer: accessToken },
+		form: {}
+	}, published.makeNodeResolver());
+	return published.promise;
 }
 
 function main(args) {
@@ -93,9 +113,6 @@ function main(args) {
 	var clientSecret = requireKey(config, 'client_secret');
 	var refreshToken = requireKey(config, 'refresh_token');
 
-	var packageUploadEndpoint = 'https://www.googleapis.com/upload/chromewebstore/v1.1/items/' + appId;
-	var packagePublishEndpoint = 'https://www.googleapis.com/chromewebstore/v1.1/items/' + appId + '/publish';
-
 	if (commander.requireTravisBranch) {
 		var travisBranch = requireEnvVar('TRAVIS_BRANCH');
 		var travisPullRequest = requireEnvVar('TRAVIS_PULL_REQUEST');
@@ -121,31 +138,42 @@ function main(args) {
 			throw new Error(sprintf('Fetching Chrome Web Store access token failed: %d %s', response.statusCode, body));
 		}
 
-		console.log('Uploading updated package', packagePath);
 		var accessTokenParams = JSON.parse(body);
-		fs.createReadStream(packagePath).pipe(request.put(packageUploadEndpoint, {
-			auth: { bearer: accessTokenParams.access_token }
-		}, function(err, response, body) {
-			if (err || response.statusCode !== 200) {
+
+		console.log('Uploading updated package', packagePath);
+		var upload = uploadPackage(packagePath, appId, accessTokenParams.access_token);
+
+		return upload.then(function(result) {
+			var response = result[0];
+			var body = result[1];
+
+			if (response.statusCode !== 200) {
 				throw new Error(sprintf('Package upload failed: %d %s', response.statusCode, body));
 			}
 			var uploadResult = JSON.parse(body);
 			if (uploadResult.uploadState == 'FAILURE') {
-				throw new Error(sprintf('Package upload error: %s', JSON.stringify(uploadResult)));
-			}
-
-			console.log('Publishing updated package', appId);
-			request.post(packagePublishEndpoint,{
-				auth: { bearer: accessTokenParams.access_token },
-				form: {}
-			}, function(err, response, body) {
-				if (err || response.statusCode !== 200) {
-					throw new Error(sprintf('Publishing updated package failed: %d %s', response.statusCode, body));
+				var currentVersionRegex = /larger version in file manifest.json than the published package: ([0-9.]+)/;
+				if (uploadResult.itemError.error_code == 'PKG_INVALID_VERSION_NUMBER') {
+					// TODO - Bump manifest version and retry upload
+				} else {
+					throw new Error(sprintf('Package upload error: %s', JSON.stringify(uploadResult)));
 				}
-
-				console.log('Updated package has been queued for publishing');
-			});
-		}));
+			} else {
+				console.log('Publishing updated package', appId);
+				return publishPackage(appId, accessTokenParams.access_token);
+			}
+		}).then(function(result) {
+			var response = result[0];
+			var body = result[1];
+			if (err || response.statusCode !== 200) {
+				throw new Error(sprintf('Publishing updated package failed: %d %s', response.statusCode, body));
+			}
+			var publishResult = JSON.parse(body);
+			console.log('Updated package has been queued for publishing');
+		}).catch(function(err) {
+			console.error('Publishing updated package failed: %s', err);
+			throw err;
+		});
 	});
 }
 
