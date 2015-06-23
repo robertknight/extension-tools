@@ -9,16 +9,9 @@
 // and then publish the new version.
 //
 // Usage:
-// 
-//   1. Use the Chrome Web Store dashboard to publish the first version
-//      of your extension and get its ID
+//   1. Follow steps in chrome-web-store.js to get the necessary authentication details
 //
-//   2. Follow the instructions at https://developer.chrome.com/webstore/using_webstore_api to
-//      obtain access credentials for the Chrome Web Store API.
-//
-//      You'll need a client ID, client secret and refresh token.
-//
-//   3. Create a config file specifying the extension ID and the
+//   2. Create a config file specifying the extension ID and the
 //      OAuth keys:
 //
 //   {
@@ -37,14 +30,19 @@
 // When publishing from a Travis CI build, this script can be configured to only
 // publish the extension if building from a specific branch (eg. 'master')
 //
+var Q = require('q');
+var assign = require('object-assign');
 var commander = require('commander');
 var fs = require('fs');
+var fsSync = require('fs-sync');
 var request = require('request');
+var os = require('os');
+var semver = require('semver');
 var sprintf = require('sprintf');
-var encryptObject = require('./encrypt-object');
-var Q = require('q');
+var JSZip = require('jszip');
 
-var GOOGLE_OAUTH_TOKEN_ENDPOINT = 'https://accounts.google.com/o/oauth2/token';
+var chromeWebStore = require('./chrome-web-store');
+var encryptObject = require('./encrypt-object');
 
 function requireEnvVar(name) {
 	var val = process.env[name];
@@ -61,23 +59,10 @@ function requireKey(obj, key) {
 	return obj[key];
 }
 
-function uploadPackage(packagePath, appId, accessToken) {
-	var uploaded = Q.defer();
-	var packageUploadEndpoint = 'https://www.googleapis.com/upload/chromewebstore/v1.1/items/' + appId;
-	fs.createReadStream(packagePath).pipe(request.put(packageUploadEndpoint, {
-		auth: { bearer: accessToken }
-	}, uploaded.makeNodeResolver()));
-	return uploaded.promise;
-}
-
-function publishPackage(appId, accessToken) {
-	var published = Q.defer();
-	var packagePublishEndpoint = 'https://www.googleapis.com/chromewebstore/v1.1/items/' + appId + '/publish';
-	request.post(packagePublishEndpoint,{
-		auth: { bearer: accessToken },
-		form: {}
-	}, published.makeNodeResolver());
-	return published.promise;
+function readManifest(packagePath) {
+	var archive = new JSZip(fs.readFileSync(packagePath));
+	var content = archive.file('manifest.json').asText();
+	return JSON.parse(content);
 }
 
 function main(args) {
@@ -89,6 +74,7 @@ function main(args) {
 	  .usage('[options] <config file> <package path>')
 	  .option('--require-travis-branch [branch]', 'For Travis CI builds, only publish when building from [branch]')
 	  .option('-p, --passphrase-var [VAR]', 'Read encryption passphrase for the config file from the environment variable VAR')
+	  .option('--autoincrement-version', 'Publish the new extension as <current version> + 0.0.1')
 	  .action(function(_configPath, _packagePath) {
 		  configPath = _configPath;
 		  packagePath = _packagePath;
@@ -123,57 +109,84 @@ function main(args) {
 		}
 	}
 
-	var accessTokenParams = {
-		client_id: clientId,
-		client_secret: clientSecret,
-		grant_type: 'refresh_token',
-		refresh_token: refreshToken
-	};
+	var appManifest = readManifest(packagePath);
+	var accessTokenParams = {};
 
 	console.log('Refreshing Chrome Web Store access token...');
-	request.post(GOOGLE_OAUTH_TOKEN_ENDPOINT,
-				 {form : accessTokenParams},
-				 function(err, response, body) {
-		if (err || response.statusCode !== 200) {
-			throw new Error(sprintf('Fetching Chrome Web Store access token failed: %d %s', response.statusCode, body));
+	return chromeWebStore.getAccessToken(clientId, clientSecret, refreshToken).then(function(_accessTokenParams) {
+		console.log('Uploading updated package', packagePath);
+		accessTokenParams = _accessTokenParams;
+		return chromeWebStore.getPackage(appId, accessTokenParams.access_token);
+	}).then(function(result) {
+		var response = result[0];
+		var body = JSON.parse(result[1]);
+		if (body.crxVersion) {
+			console.log('Existing version ', body.crxVersion);
 		}
 
-		var accessTokenParams = JSON.parse(body);
+		if (!semver.valid(body.crxVersion)) {
+			throw new Error(sprintf('Existing item version \'%s\' is not a valid semver version', body.crxVersion));
+		}
+		if (!semver.valid(appManifest.version)) {
+			throw new Error(sprintf('Version in manifest \'%s\' is not a valid semver version', appManifest.version));
+		}
 
-		console.log('Uploading updated package', packagePath);
-		var upload = uploadPackage(packagePath, appId, accessTokenParams.access_token);
+		if (!semver.gt(appManifest.version, body.crxVersion)) {
+			if (commander.autoincrementVersion) {
+				// copy the original manifest to a temporary directory, auto-increment
+				// the version in the manifest file and upload the result
+				var newVersion = semver.inc(body.crxVersion, 'patch');
+				console.log('Auto-incrementing version from %s to %s', body.crxVersion, newVersion);
+				var tempPackagePath = os.tmpdir() + '/' + appId + '.zip';
 
-		return upload.then(function(result) {
-			var response = result[0];
-			var body = result[1];
+				// read original package, update manifest
+				var newManifest = assign({}, appManifest, {version: newVersion});
+				var tempArchive = new JSZip(fs.readFileSync(packagePath));
+				tempArchive.file('manifest.json', JSON.stringify(newManifest, null, 2));
 
-			if (response.statusCode !== 200) {
-				throw new Error(sprintf('Package upload failed: %d %s', response.statusCode, body));
-			}
-			var uploadResult = JSON.parse(body);
-			if (uploadResult.uploadState == 'FAILURE') {
-				var currentVersionRegex = /larger version in file manifest.json than the published package: ([0-9.]+)/;
-				if (uploadResult.itemError.error_code == 'PKG_INVALID_VERSION_NUMBER') {
-					// TODO - Bump manifest version and retry upload
-				} else {
-					throw new Error(sprintf('Package upload error: %s', JSON.stringify(uploadResult)));
-				}
+				// write out updated package
+				var tempArchiveData = tempArchive.generate({type: 'nodebuffer'});
+				fs.writeFileSync(tempPackagePath, tempArchiveData);
+
+				packagePath = tempPackagePath;
 			} else {
-				console.log('Publishing updated package', appId);
-				return publishPackage(appId, accessTokenParams.access_token);
+				throw new Error(sprintf('Input version \'%s\' is <= current version on Chrome Web Store (\'%s\')',
+				  appManifest.version, body.crxVersion));
 			}
-		}).then(function(result) {
-			var response = result[0];
-			var body = result[1];
-			if (err || response.statusCode !== 200) {
-				throw new Error(sprintf('Publishing updated package failed: %d %s', response.statusCode, body));
+		}
+
+		return chromeWebStore.uploadPackage(packagePath, appId, accessTokenParams.access_token);
+	}).then(function(result) {
+		var response = result[0];
+		var body = result[1];
+
+		if (response.statusCode !== 200) {
+			throw new Error(sprintf('Package upload failed: %d %s', response.statusCode, body));
+		}
+		var uploadResult = JSON.parse(body);
+		if (uploadResult.uploadState == 'FAILURE') {
+			var currentVersionRegex = /larger version in file manifest.json than the published package: ([0-9.]+)/;
+			if (uploadResult.itemError) {
+				throw new Error(sprintf('Package upload error: %s', JSON.stringify(uploadResult)));
 			}
-			var publishResult = JSON.parse(body);
-			console.log('Updated package has been queued for publishing');
-		}).catch(function(err) {
-			console.error('Publishing updated package failed: %s', err);
-			throw err;
-		});
+		} else {
+			console.log('Publishing updated package', appId);
+			return chromeWebStore.publishPackage(appId, accessTokenParams.access_token);
+		}
+	}).then(function(result) {
+		var response = result[0];
+		var body = result[1];
+		if (response.statusCode !== 200) {
+			throw new Error(sprintf('Publishing updated package failed: %d %s', response.statusCode, body));
+		}
+		var publishResult = JSON.parse(body);
+		if (publishResult.itemError) {
+			throw new Error(sprintf('Package publish error: %s', JSON.stringify(publishResult)));
+		}
+		console.log('Updated package has been queued for publishing');
+	}).catch(function(err) {
+		console.error('Publishing updated package failed: %s', err);
+		throw err;
 	});
 }
 

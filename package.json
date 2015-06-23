@@ -30,8 +30,12 @@
   "homepage": "https://github.com/robertknight/extension-tools",
   "dependencies": {
     "commander": "^2.8.1",
+    "fs-sync": "^0.2.5",
+    "jszip": "^2.5.0",
+    "object-assign": "^3.0.0",
     "q": "^1.4.1",
     "request": "^2.58.0",
+    "semver": "^4.3.6",
     "sprintf": "^0.1.5"
   },
   "devDependencies": {
