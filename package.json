@@ -1,6 +1,6 @@
 {
   "name": "extension-tools",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A collection of tools for automated publishing of browser extensions",
   "main": "exec.js",
   "scripts": {

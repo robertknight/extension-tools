@@ -65,6 +65,11 @@ function readManifest(packagePath) {
 	return JSON.parse(content);
 }
 
+function fatalError(err) {
+	console.error('Publishing to Chrome Web Store failed:', err.message, err.stack);
+	process.exit(1);
+}
+
 function main(args) {
 	var configPath;
 	var packagePath;
@@ -186,19 +191,14 @@ function main(args) {
 		console.log('Updated package has been queued for publishing');
 	}).catch(function(err) {
 		console.error('Publishing updated package failed: %s', err);
-		throw err;
+		fatalError(err);
 	});
 }
 
-var onErr = function(err) {
-	console.error('Publishing to Chrome Web Store failed:', err.message, err.stack);
-	process.exit(1);
-};
-process.on('uncaughtException', onErr);
-
 try {
+	process.on('uncaughtException', fatalError);
 	main(process.argv);
 } catch (err) {
-	onErr(err);
+	fatalError(err);
 }
 
