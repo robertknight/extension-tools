@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "name": "extension-tools-test",
   "description": "Test extension for the extension-tools package",
-  "version": "0.1.0",
+  "version": "0.3.1.1",
   "homepage_url": "https://github.com/robertknight/extension-tools",
   "permissions": [],
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArmxlTgMhwoKggmrQRqKYcPRo9olv5v12gDmk5GftSFYvT1mKL0+CxLy2HndUVT1Chk3lHBFsc65cpoqdExxvUrKFH/k+svAR37OaU6XqOthE3Z49ybihehAWQer/OgQkBT/FVzwSxGlhvPtoWNDAv/MdiyuZtsStSRqVVpfOYZx5bxKe0KIG/3+yBBev1xJzITRC/hGOrAmzwwCGpmQeq7JfDzzqNf/1fdnii3o6AoSBS8Cyv/vnZl8VRlXhdGhhil+R9LFnxpcq04N4maGPi91HUFvHy27XFijqLSnL5hhG5PXTTeUQpBnXdhJZE2VgQhHl3WMDvlyMoZqW8PstDQIDAQAB"

@@ -37,11 +37,11 @@ var fs = require('fs');
 var fsSync = require('fs-sync');
 var request = require('request');
 var os = require('os');
-var semver = require('semver');
 var sprintf = require('sprintf');
 var JSZip = require('jszip');
 
 var chromeWebStore = require('./chrome-web-store');
+var extensionVersion = require('./extension-version');
 var encryptObject = require('./encrypt-object');
 
 function requireEnvVar(name) {
@@ -79,7 +79,8 @@ function main(args) {
 	  .usage('[options] <config file> <package path>')
 	  .option('--require-travis-branch [branch]', 'For Travis CI builds, only publish when building from [branch]')
 	  .option('-p, --passphrase-var [VAR]', 'Read encryption passphrase for the config file from the environment variable VAR')
-	  .option('--autoincrement-version', 'Publish the new extension as <current version> + 0.0.1')
+	  .option('--autoincrement-version', 'Publish the extension as <current version> + 0.0.1')
+	  .option('--set-version [VERSION]', 'Publish the extension with the given VERSION')
 	  .action(function(_configPath, _packagePath) {
 		  configPath = _configPath;
 		  packagePath = _packagePath;
@@ -126,38 +127,48 @@ function main(args) {
 		var response = result[0];
 		var body = JSON.parse(result[1]);
 		if (body.crxVersion) {
-			console.log('Existing version ', body.crxVersion);
+			console.log('Current version on store: \'%s\'', body.crxVersion);
 		}
 
-		if (!semver.valid(body.crxVersion)) {
-			throw new Error(sprintf('Existing item version \'%s\' is not a valid semver version', body.crxVersion));
+		if (!extensionVersion.isValid(body.crxVersion)) {
+			throw new Error(sprintf('Existing item version \'%s\' is not a valid Chrome extension version', body.crxVersion));
 		}
-		if (!semver.valid(appManifest.version)) {
-			throw new Error(sprintf('Version in manifest \'%s\' is not a valid semver version', appManifest.version));
+		if (!extensionVersion.isValid(appManifest.version)) {
+			throw new Error(sprintf('Version in manifest \'%s\' is not a valid Chrome extension version', appManifest.version));
 		}
 
-		if (!semver.gt(appManifest.version, body.crxVersion)) {
+		var isManifestVersionNewer = extensionVersion.lessThan(body.crxVersion, appManifest.version);
+		if ((!isManifestVersionNewer && commander.autoincrementVersion) || commander.setVersion) {
+			var newVersion;
+
+			// copy the original manifest to a temporary directory, auto-increment
+			// the version in the manifest file and upload the result
 			if (commander.autoincrementVersion) {
-				// copy the original manifest to a temporary directory, auto-increment
-				// the version in the manifest file and upload the result
-				var newVersion = semver.inc(body.crxVersion, 'patch');
-				console.log('Auto-incrementing version from %s to %s', body.crxVersion, newVersion);
-				var tempPackagePath = os.tmpdir() + '/' + appId + '.zip';
-
-				// read original package, update manifest
-				var newManifest = assign({}, appManifest, {version: newVersion});
-				var tempArchive = new JSZip(fs.readFileSync(packagePath));
-				tempArchive.file('manifest.json', JSON.stringify(newManifest, null, 2));
-
-				// write out updated package
-				var tempArchiveData = tempArchive.generate({type: 'nodebuffer'});
-				fs.writeFileSync(tempPackagePath, tempArchiveData);
-
-				packagePath = tempPackagePath;
-			} else {
-				throw new Error(sprintf('Input version \'%s\' is <= current version on Chrome Web Store (\'%s\')',
-				  appManifest.version, body.crxVersion));
+				newVersion = extensionVersion.increment(body.crxVersion, 3);
+			} else if (commander.setVersion) {
+				newVersion = commander.setVersion;
+				if (!extensionVersion.isValid(newVersion)) {
+					throw new Error(sprintf('Version number \'%s\' specified with --set-version is not a valid Chrome extension version',
+					  newVersion));
+				}
 			}
+			console.log('Setting new version to \'%s\'', newVersion);
+
+			var tempPackagePath = os.tmpdir() + '/' + appId + '.zip';
+
+			// read original package, update manifest
+			var newManifest = assign({}, appManifest, {version: newVersion});
+			var tempArchive = new JSZip(fs.readFileSync(packagePath));
+			tempArchive.file('manifest.json', JSON.stringify(newManifest, null, 2));
+
+			// write out updated package
+			var tempArchiveData = tempArchive.generate({type: 'nodebuffer'});
+			fs.writeFileSync(tempPackagePath, tempArchiveData);
+
+			packagePath = tempPackagePath;
+		} else if (!isManifestVersionNewer) {
+			throw new Error(sprintf('Input version \'%s\' is <= current version on Chrome Web Store (\'%s\')',
+			  appManifest.version, body.crxVersion));
 		}
 
 		return chromeWebStore.uploadPackage(packagePath, appId, accessTokenParams.access_token);
