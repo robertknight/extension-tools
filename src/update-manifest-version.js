@@ -12,9 +12,18 @@ function setVersionKey(manifestPath, newVersion) {
 	fs.writeFileSync(manifestPath, JSON.stringify(manifest, null /* replacer */, 2) + '\n')
 }
 
+/// Returns the name of the currently checked-out Git branch or null
+/// if HEAD is not a Git branch.
 function gitBranch() {
-	return exec('git', 'symbolic-ref', '--short', 'HEAD').then(function(result) {
+	return exec('git', 'symbolic-ref', '--short', '--quiet', 'HEAD').then(function(result) {
 		return result[0].trim();
+	}).catch(function(err) {
+		if (err instanceof exec.CommandError && err.status == 1) {
+			// detached HEAD, return null to represent an unknown branch
+			return null;
+		} else {
+			throw err;
+		}
 	});
 }
 

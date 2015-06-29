@@ -35,4 +35,6 @@ function exec() {
 }
 
 module.exports = exec;
+module.exports.CommandError = CommandError;
+
 
