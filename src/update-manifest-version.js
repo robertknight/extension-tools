@@ -7,7 +7,7 @@ var exec = require('./exec');
 var gitVersion = require('./git-version');
 
 function setVersionKey(manifestPath, newVersion) {
-	var manifest = JSON.parse(fs.readFileSync(manifestPath));
+	var manifest = JSON.parse(fs.readFileSync(manifestPath).toString());
 	manifest.version = newVersion;
 	fs.writeFileSync(manifestPath, JSON.stringify(manifest, null /* replacer */, 2) + '\n')
 }
@@ -49,6 +49,7 @@ function main() {
 		return gitVersion.gitVersion();
 	}).then(function(version) {
 		var buildVersion = gitVersion.buildVersionFromGitVersion(version);
+		console.log('Setting version to "%s"', buildVersion);
 		setVersionKey(manifestPath, buildVersion);
 	}).done();
 }
