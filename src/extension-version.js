@@ -23,18 +23,17 @@ function lessThan(versionA, versionB) {
 	var aParts = versionA.split('.');
 	var bParts = versionB.split('.');
 
-	var aHead = aParts[0] || 0;
-	var bHead = bParts[0] || 0;
+	var partsLength = Math.max(aParts.length, bParts.length);
 
-	if (aParts.length == 1 && bParts.length == 1) {
-		return aHead < bHead;
-	} else if (aHead != bHead) {
-		return aHead < bHead;
-	} else {
-		var aTail = aParts.slice(1).join('.');
-		var bTail = bParts.slice(1).join('.');
-		return aHead < bHead || lessThan(aTail, bTail);
+	for(var x = 0; x < partsLength; x++) {
+		var aVal = isNaN(aParts[x]) ? 0 : +aParts[x];
+		var bVal = isNaN(bParts[x]) ? 0 : +bParts[x];
+		if (aVal !== bVal) {
+			return aVal < bVal;
+		}
 	}
+	// if we reached the end of the loop the 2 version are equals
+	return false;
 }
 
 function increment(version, componentIndex) {
