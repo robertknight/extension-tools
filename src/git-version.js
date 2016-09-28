@@ -21,27 +21,27 @@ const exec = require('./exec');
 // before upating the manifest.
 
 function convertShallowToFullClone() {
-	if (fs.existsSync('.git/shallow')) {
-		return exec('git', 'fetch', '--unshallow');
-	} else {
-		return Q();
-	}
+  if (fs.existsSync('.git/shallow')) {
+    return exec('git', 'fetch', '--unshallow');
+  } else {
+    return Q();
+  }
 }
 
 // Returns the length of the commit history on the current Git
 // branch
 function getLinearHistoryLength() {
-	return convertShallowToFullClone().then(() => exec('git', 'log', '--format="%h"')).then(result => {
-		const status = result[0];
-		const commitList = result[1];
-		const commits = commitList.trim().split('\n');
-		return commits.length;
-	});
+  return convertShallowToFullClone().then(() => exec('git', 'log', '--format="%h"')).then(result => {
+    const status = result[0];
+    const commitList = result[1];
+    const commits = commitList.trim().split('\n');
+    return commits.length;
+  });
 }
 
 // Returns the version of the current branch using 'git describe --tags --long'
 function gitVersion() {
-	return convertShallowToFullClone().then(() => exec('git', 'describe', '--tags', '--long')).then(result => result[0].trim());
+  return convertShallowToFullClone().then(() => exec('git', 'describe', '--tags', '--long')).then(result => result[0].trim());
 }
 
 // takes a version number produced by git describe of the form
@@ -50,14 +50,14 @@ function gitVersion() {
 // 'MAJOR', 'MINOR' and 'PATCH' are taken from the '$TAG' and '$BUILD'
 // is set to the number of commits since the tag
 function buildVersionFromGitVersion(gitVersion) {
-	const gitVersionParts = gitVersion.match(/([0-9\.]+)-([0-9]+)-([^-]+)/);
-	if (!gitVersionParts) {
-		throw new Error(gitVersion.toString() + ' is not of the expected form $TAG-$COMMITS_SINCE_TAG-g$HASH');
-	}
-	return [gitVersionParts[1], gitVersionParts[2]].join('.');
+  const gitVersionParts = gitVersion.match(/([0-9\.]+)-([0-9]+)-([^-]+)/);
+  if (!gitVersionParts) {
+    throw new Error(gitVersion.toString() + ' is not of the expected form $TAG-$COMMITS_SINCE_TAG-g$HASH');
+  }
+  return [gitVersionParts[1], gitVersionParts[2]].join('.');
 }
 
 module.exports = {
-	buildVersionFromGitVersion: buildVersionFromGitVersion,
-	gitVersion: gitVersion
+  buildVersionFromGitVersion: buildVersionFromGitVersion,
+  gitVersion: gitVersion
 };
