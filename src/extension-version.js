@@ -47,7 +47,7 @@ function increment(version, componentIndex) {
 }
 
 module.exports = {
-  isValid: isValid,
-  lessThan: lessThan,
-  increment: increment
+  isValid,
+  lessThan,
+  increment
 };

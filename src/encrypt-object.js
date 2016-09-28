@@ -56,11 +56,11 @@ function decryptObject(obj, passphrase, iterations) {
 }
 
 module.exports = {
-  DEFAULT_ITERATIONS: DEFAULT_ITERATIONS,
-  encryptString: encryptString,
-  decryptString: decryptString,
-  encryptObject: encryptObject,
-  decryptObject: decryptObject
+  DEFAULT_ITERATIONS,
+  encryptString,
+  decryptString,
+  encryptObject,
+  decryptObject
 };
 
 if (require.main === module) {

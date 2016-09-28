@@ -58,6 +58,6 @@ function buildVersionFromGitVersion(gitVersion) {
 }
 
 module.exports = {
-  buildVersionFromGitVersion: buildVersionFromGitVersion,
-  gitVersion: gitVersion
+  buildVersionFromGitVersion,
+  gitVersion
 };

@@ -53,7 +53,7 @@ function main() {
 }
 
 module.exports = {
-  setVersionKey: setVersionKey
+  setVersionKey
 };
 
 if (require.main === module) {

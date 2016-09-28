@@ -76,8 +76,8 @@ function getPackage(appId, accessToken) {
 }
 
 module.exports = {
-  getAccessToken: getAccessToken,
-  getPackage: getPackage,
-  uploadPackage: uploadPackage,
-  publishPackage: publishPackage
+  getAccessToken,
+  getPackage,
+  uploadPackage,
+  publishPackage
 };
