@@ -1,29 +1,29 @@
-var crypto = require('crypto');
+const crypto = require('crypto');
 
 // fast, but not strong.
-var DEFAULT_ITERATIONS = 2000;
+const DEFAULT_ITERATIONS = 2000;
 
-var CRYPTO_ALGORITHM = 'aes-128-cbc';
-var IV_LENGTH = 16;
-var KEY_LENGTH = 16;
+const CRYPTO_ALGORITHM = 'aes-128-cbc';
+const IV_LENGTH = 16;
+const KEY_LENGTH = 16;
 
 // encrypt a string using CRYPTO_ALGORITHM with a given
 // passphrase
 function encryptString(input, passphrase, iterations) {
-	var iv = crypto.pseudoRandomBytes(IV_LENGTH);
-	var key = crypto.pbkdf2Sync(passphrase, iv, iterations, KEY_LENGTH);
-	var cipher = crypto.createCipheriv(CRYPTO_ALGORITHM, key, iv);
-	var encrypted = Buffer.concat([cipher.update(input, 'binary'), cipher.final()]);
+	const iv = crypto.pseudoRandomBytes(IV_LENGTH);
+	const key = crypto.pbkdf2Sync(passphrase, iv, iterations, KEY_LENGTH);
+	const cipher = crypto.createCipheriv(CRYPTO_ALGORITHM, key, iv);
+	const encrypted = Buffer.concat([cipher.update(input, 'binary'), cipher.final()]);
 	return Buffer.concat([iv, encrypted]).toString('base64');
 }
 
 function decryptString(encryptedBase64, passphrase, iterations) {
-	var encryptedBinary = Buffer(encryptedBase64, 'base64');
-	var iv = encryptedBinary.slice(0, IV_LENGTH);
-	var key = crypto.pbkdf2Sync(passphrase, iv, iterations, KEY_LENGTH);
-	var data = encryptedBinary.slice(IV_LENGTH);
-	var decipher = crypto.createDecipheriv(CRYPTO_ALGORITHM, key, iv);
-	var decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
+	const encryptedBinary = Buffer(encryptedBase64, 'base64');
+	const iv = encryptedBinary.slice(0, IV_LENGTH);
+	const key = crypto.pbkdf2Sync(passphrase, iv, iterations, KEY_LENGTH);
+	const data = encryptedBinary.slice(IV_LENGTH);
+	const decipher = crypto.createDecipheriv(CRYPTO_ALGORITHM, key, iv);
+	const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
 	return decrypted.toString('binary');
 }
 
@@ -33,7 +33,7 @@ function isIgnoredKey(key) {
 
 function encryptObject(obj, passphrase, iterations) {
 	encrypted = {};
-	for (var key in obj) {
+	for (const key in obj) {
 		if (isIgnoredKey(key)) {
 			encrypted[key] = obj[key];
 		} else {
@@ -45,7 +45,7 @@ function encryptObject(obj, passphrase, iterations) {
 
 function decryptObject(obj, passphrase, iterations) {
 	decrypted = {};
-	for (var key in obj) {
+	for (const key in obj) {
 		if (isIgnoredKey(key)) {
 			decrypted[key] = obj[key];
 		} else {
@@ -64,15 +64,15 @@ module.exports = {
 };
 
 if (require.main === module) {
-	var content = '';
+	let content = '';
 	process.stdin.setEncoding('utf-8');
-	process.stdin.on('data', function(chunk) {
+	process.stdin.on('data', chunk => {
 		content += chunk;
 	});
-	process.stdin.on('end', function() {
-		var inputPassphrase = process.argv[2];
-		var input = JSON.parse(content);
-		var encrypted = encryptObject(input, inputPassphrase, DEFAULT_ITERATIONS);
+	process.stdin.on('end', () => {
+		const inputPassphrase = process.argv[2];
+		const input = JSON.parse(content);
+		const encrypted = encryptObject(input, inputPassphrase, DEFAULT_ITERATIONS);
 		console.log(JSON.stringify(encrypted, null, 2));
 	});
 }

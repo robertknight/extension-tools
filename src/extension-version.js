@@ -20,14 +20,14 @@ function lessThan(versionA, versionB) {
 		throw new Error('Extension version ' + versionB + ' is not valid');
 	}
 
-	var aParts = versionA.split('.');
-	var bParts = versionB.split('.');
+	const aParts = versionA.split('.');
+	const bParts = versionB.split('.');
 
-	var partsLength = Math.max(aParts.length, bParts.length);
+	const partsLength = Math.max(aParts.length, bParts.length);
 
-	for(var x = 0; x < partsLength; x++) {
-		var aVal = isNaN(aParts[x]) ? 0 : +aParts[x];
-		var bVal = isNaN(bParts[x]) ? 0 : +bParts[x];
+	for(let x = 0; x < partsLength; x++) {
+		const aVal = isNaN(aParts[x]) ? 0 : +aParts[x];
+		const bVal = isNaN(bParts[x]) ? 0 : +bParts[x];
 		if (aVal !== bVal) {
 			return aVal < bVal;
 		}
@@ -37,7 +37,7 @@ function lessThan(versionA, versionB) {
 }
 
 function increment(version, componentIndex) {
-	return version.split('.').map(function(component, index) {
+	return version.split('.').map((component, index) => {
 		if (index === componentIndex) {
 			return (parseInt(component) + 1).toString();
 		} else {

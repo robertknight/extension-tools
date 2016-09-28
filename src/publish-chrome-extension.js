@@ -30,22 +30,22 @@
 // When publishing from a Travis CI build, this script can be configured to only
 // publish the extension if building from a specific branch (eg. 'master')
 //
-var Q = require('q');
-var assign = require('object-assign');
-var commander = require('commander');
-var fs = require('fs');
-var fsSync = require('fs-sync');
-var request = require('request');
-var os = require('os');
-var sprintf = require('sprintf');
-var JSZip = require('jszip');
+const Q = require('q');
+const assign = require('object-assign');
+const commander = require('commander');
+const fs = require('fs');
+const fsSync = require('fs-sync');
+const request = require('request');
+const os = require('os');
+const sprintf = require('sprintf');
+const JSZip = require('jszip');
 
-var chromeWebStore = require('./chrome-web-store');
-var extensionVersion = require('./extension-version');
-var encryptObject = require('./encrypt-object');
+const chromeWebStore = require('./chrome-web-store');
+const extensionVersion = require('./extension-version');
+const encryptObject = require('./encrypt-object');
 
 function requireEnvVar(name) {
-	var val = process.env[name];
+	const val = process.env[name];
 	if (typeof val !== 'string') {
 		throw new Error(sprintf('Required environment variable %s is not set', name));
 	}
@@ -60,8 +60,8 @@ function requireKey(obj, key) {
 }
 
 function readManifest(packagePath) {
-	var archive = new JSZip(fs.readFileSync(packagePath));
-	var content = archive.file('manifest.json').asText();
+	const archive = new JSZip(fs.readFileSync(packagePath));
+	const content = archive.file('manifest.json').asText();
 	return JSON.parse(content);
 }
 
@@ -71,8 +71,8 @@ function fatalError(err) {
 }
 
 function main(args) {
-	var configPath;
-	var packagePath;
+	let configPath;
+	let packagePath;
 
 	commander
 	  .description('Upload a Chrome extension to the Chrome Web Store')
@@ -81,7 +81,7 @@ function main(args) {
 	  .option('-p, --passphrase-var [VAR]', 'Read encryption passphrase for the config file from the environment variable VAR')
 	  .option('--autoincrement-version', 'Publish the extension as <current version> + 0.0.1')
 	  .option('--set-version [VERSION]', 'Publish the extension with the given VERSION')
-	  .action(function(_configPath, _packagePath) {
+	  .action((_configPath, _packagePath) => {
 		  configPath = _configPath;
 		  packagePath = _packagePath;
 	  });
@@ -94,20 +94,20 @@ function main(args) {
 		throw new Error('Config path not specified');
 	}
 
-	var config = JSON.parse(fs.readFileSync(configPath));
+	let config = JSON.parse(fs.readFileSync(configPath));
 	if (commander.passphraseVar) {
-		var passphrase = requireEnvVar(commander.passphraseVar);
+		const passphrase = requireEnvVar(commander.passphraseVar);
 		config = encryptObject.decryptObject(config, passphrase, encryptObject.DEFAULT_ITERATIONS);
 	}
 
-	var appId = requireKey(config, 'app_id');
-	var clientId = requireKey(config, 'client_id');
-	var clientSecret = requireKey(config, 'client_secret');
-	var refreshToken = requireKey(config, 'refresh_token');
+	const appId = requireKey(config, 'app_id');
+	const clientId = requireKey(config, 'client_id');
+	const clientSecret = requireKey(config, 'client_secret');
+	const refreshToken = requireKey(config, 'refresh_token');
 
 	if (commander.requireTravisBranch) {
-		var travisBranch = requireEnvVar('TRAVIS_BRANCH');
-		var travisPullRequest = requireEnvVar('TRAVIS_PULL_REQUEST');
+		const travisBranch = requireEnvVar('TRAVIS_BRANCH');
+		const travisPullRequest = requireEnvVar('TRAVIS_PULL_REQUEST');
 		if (travisBranch !== commander.requireTravisBranch || travisPullRequest !== 'false') {
 			console.log('Current branch \'%s\' does not match \'%s\'. Skipping upload.',
 			  travisBranch, commander.requireTravisBranch);
@@ -115,17 +115,17 @@ function main(args) {
 		}
 	}
 
-	var appManifest = readManifest(packagePath);
-	var accessTokenParams = {};
+	const appManifest = readManifest(packagePath);
+	let accessTokenParams = {};
 
 	console.log('Refreshing Chrome Web Store access token...');
-	return chromeWebStore.getAccessToken(clientId, clientSecret, refreshToken).then(function(_accessTokenParams) {
+	return chromeWebStore.getAccessToken(clientId, clientSecret, refreshToken).then(_accessTokenParams => {
 		console.log('Uploading updated package', packagePath);
 		accessTokenParams = _accessTokenParams;
 		return chromeWebStore.getPackage(appId, accessTokenParams.access_token);
-	}).then(function(result) {
-		var response = result[0];
-		var body = JSON.parse(result[1]);
+	}).then(result => {
+		const response = result[0];
+		const body = JSON.parse(result[1]);
 		if (body.crxVersion) {
 			console.log('Current version on store: \'%s\'', body.crxVersion);
 		}
@@ -137,9 +137,9 @@ function main(args) {
 			throw new Error(sprintf('Version in manifest \'%s\' is not a valid Chrome extension version', appManifest.version));
 		}
 
-		var isManifestVersionNewer = extensionVersion.lessThan(body.crxVersion, appManifest.version);
+		const isManifestVersionNewer = extensionVersion.lessThan(body.crxVersion, appManifest.version);
 		if ((!isManifestVersionNewer && commander.autoincrementVersion) || commander.setVersion) {
-			var newVersion;
+			let newVersion;
 
 			// copy the original manifest to a temporary directory, auto-increment
 			// the version in the manifest file and upload the result
@@ -154,15 +154,15 @@ function main(args) {
 			}
 			console.log('Setting new version to \'%s\'', newVersion);
 
-			var tempPackagePath = os.tmpdir() + '/' + appId + '.zip';
+			const tempPackagePath = os.tmpdir() + '/' + appId + '.zip';
 
 			// read original package, update manifest
-			var newManifest = assign({}, appManifest, {version: newVersion});
-			var tempArchive = new JSZip(fs.readFileSync(packagePath));
+			const newManifest = assign({}, appManifest, {version: newVersion});
+			const tempArchive = new JSZip(fs.readFileSync(packagePath));
 			tempArchive.file('manifest.json', JSON.stringify(newManifest, null, 2));
 
 			// write out updated package
-			var tempArchiveData = tempArchive.generate({type: 'nodebuffer'});
+			const tempArchiveData = tempArchive.generate({type: 'nodebuffer'});
 			fs.writeFileSync(tempPackagePath, tempArchiveData);
 
 			packagePath = tempPackagePath;
@@ -172,16 +172,16 @@ function main(args) {
 		}
 
 		return chromeWebStore.uploadPackage(packagePath, appId, accessTokenParams.access_token);
-	}).then(function(result) {
-		var response = result[0];
-		var body = result[1];
+	}).then(result => {
+		const response = result[0];
+		const body = result[1];
 
 		if (response.statusCode !== 200) {
 			throw new Error(sprintf('Package upload failed: %d %s', response.statusCode, body));
 		}
-		var uploadResult = JSON.parse(body);
+		const uploadResult = JSON.parse(body);
 		if (uploadResult.uploadState == 'FAILURE') {
-			var currentVersionRegex = /larger version in file manifest.json than the published package: ([0-9.]+)/;
+			const currentVersionRegex = /larger version in file manifest.json than the published package: ([0-9.]+)/;
 			if (uploadResult.itemError) {
 				throw new Error(sprintf('Package upload error: %s', JSON.stringify(uploadResult)));
 			}
@@ -189,18 +189,18 @@ function main(args) {
 			console.log('Publishing updated package', appId);
 			return chromeWebStore.publishPackage(appId, accessTokenParams.access_token);
 		}
-	}).then(function(result) {
-		var response = result[0];
-		var body = result[1];
+	}).then(result => {
+		const response = result[0];
+		const body = result[1];
 		if (response.statusCode !== 200) {
 			throw new Error(sprintf('Publishing updated package failed: %d %s', response.statusCode, body));
 		}
-		var publishResult = JSON.parse(body);
+		const publishResult = JSON.parse(body);
 		if (publishResult.itemError) {
 			throw new Error(sprintf('Package publish error: %s', JSON.stringify(publishResult)));
 		}
 		console.log('Updated package has been queued for publishing');
-	}).catch(function(err) {
+	}).catch(err => {
 		console.error('Publishing updated package failed: %s', err);
 		fatalError(err);
 	});

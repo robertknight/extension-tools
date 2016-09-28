@@ -16,25 +16,25 @@
 //   4. Use the remaining methods to retrieve items, upload new versions of items
 //      and publish new releases.
 
-var Q = require('q');
-var fs = require('fs');
-var request = require('request');
-var sprintf = require('sprintf');
+const Q = require('q');
+const fs = require('fs');
+const request = require('request');
+const sprintf = require('sprintf');
 
 function getAccessToken(clientId, clientSecret, refreshToken) {
-	var accessTokenParams = {
+	const accessTokenParams = {
 		client_id: clientId,
 		client_secret: clientSecret,
 		grant_type: 'refresh_token',
 		refresh_token: refreshToken
 	};
 
-	var GOOGLE_OAUTH_TOKEN_ENDPOINT = 'https://accounts.google.com/o/oauth2/token';
-	var accessToken = Q.defer();
+	const GOOGLE_OAUTH_TOKEN_ENDPOINT = 'https://accounts.google.com/o/oauth2/token';
+	const accessToken = Q.defer();
 	request.post(GOOGLE_OAUTH_TOKEN_ENDPOINT, {form: accessTokenParams}, accessToken.makeNodeResolver());
-	return accessToken.promise.then(function(response) {
-		var result = response[0];
-		var body = response[1];
+	return accessToken.promise.then(response => {
+		const result = response[0];
+		const body = response[1];
 
 		if (result.statusCode !== 200) {
 			throw new Error(sprintf('Fetching Chrome Web Store access token failed: %d %s', result.statusCode, body));
@@ -44,8 +44,8 @@ function getAccessToken(clientId, clientSecret, refreshToken) {
 }
 
 function uploadPackage(packagePath, appId, accessToken) {
-	var uploaded = Q.defer();
-	var packageUploadEndpoint = 'https://www.googleapis.com/upload/chromewebstore/v1.1/items/' + appId;
+	const uploaded = Q.defer();
+	const packageUploadEndpoint = 'https://www.googleapis.com/upload/chromewebstore/v1.1/items/' + appId;
 	fs.createReadStream(packagePath).pipe(request.put(packageUploadEndpoint, {
 		auth: { bearer: accessToken }
 	}, uploaded.makeNodeResolver()));
@@ -53,8 +53,8 @@ function uploadPackage(packagePath, appId, accessToken) {
 }
 
 function publishPackage(appId, accessToken) {
-	var published = Q.defer();
-	var packagePublishEndpoint = 'https://www.googleapis.com/chromewebstore/v1.1/items/' + appId + '/publish';
+	const published = Q.defer();
+	const packagePublishEndpoint = 'https://www.googleapis.com/chromewebstore/v1.1/items/' + appId + '/publish';
 	request.post(packagePublishEndpoint,{
 		auth: { bearer: accessToken },
 		form: {}
@@ -63,8 +63,8 @@ function publishPackage(appId, accessToken) {
 }
 
 function getPackage(appId, accessToken) {
-	var fetched = Q.defer();
-	var packageURL = 'https://www.googleapis.com/chromewebstore/v1.1/items/' + appId;
+	const fetched = Q.defer();
+	const packageURL = 'https://www.googleapis.com/chromewebstore/v1.1/items/' + appId;
 	request.get({
 		url: packageURL,
 		auth: { bearer: accessToken },

@@ -1,7 +1,7 @@
-var child_process = require('child_process');
-var fs = require('fs');
-var Q = require('q');
-var util = require('util');
+const child_process = require('child_process');
+const fs = require('fs');
+const Q = require('q');
+const util = require('util');
 
 function CommandError(cmd, status, stdout, stderr) {
 	Error.call(this);
@@ -13,18 +13,18 @@ function CommandError(cmd, status, stdout, stderr) {
 util.inherits(CommandError, Error);
 
 function exec() {
-	var result = Q.defer();
-	var cmdArgs = Array.prototype.slice.call(arguments);
-	var proc = child_process.spawn(cmdArgs[0], cmdArgs.slice(1));
-	var stdout = '';
-	var stderr = '';
-	proc.stdout.on('data', function(data) {
+	const result = Q.defer();
+	const cmdArgs = Array.prototype.slice.call(arguments);
+	const proc = child_process.spawn(cmdArgs[0], cmdArgs.slice(1));
+	let stdout = '';
+	let stderr = '';
+	proc.stdout.on('data', data => {
 		stdout += data.toString();
 	});
-	proc.stderr.on('data', function(data) {
+	proc.stderr.on('data', data => {
 		stderr += data.toString();
 	});
-	proc.on('close', function(status) {
+	proc.on('close', status => {
 		if (status == 0) {
 			result.resolve([stdout, stderr]);
 		} else {

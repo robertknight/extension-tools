@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-var fs = require('fs');
-var Q = require('q');
+const fs = require('fs');
+const Q = require('q');
 
-var exec = require('./exec');
+const exec = require('./exec');
 
 // Update the 'version' field in a JSON manifest
 // file based on the number of commits since
@@ -31,23 +31,17 @@ function convertShallowToFullClone() {
 // Returns the length of the commit history on the current Git
 // branch
 function getLinearHistoryLength() {
-	return convertShallowToFullClone().then(function() {
-		return exec('git', 'log', '--format="%h"')
-	}).then(function(result) {
-		var status = result[0];
-		var commitList = result[1];
-		var commits = commitList.trim().split('\n');
+	return convertShallowToFullClone().then(() => exec('git', 'log', '--format="%h"')).then(result => {
+		const status = result[0];
+		const commitList = result[1];
+		const commits = commitList.trim().split('\n');
 		return commits.length;
 	});
 }
 
 // Returns the version of the current branch using 'git describe --tags --long'
 function gitVersion() {
-	return convertShallowToFullClone().then(function() {
-		return exec('git', 'describe', '--tags', '--long');
-	}).then(function(result) {
-		return result[0].trim();
-	});
+	return convertShallowToFullClone().then(() => exec('git', 'describe', '--tags', '--long')).then(result => result[0].trim());
 }
 
 // takes a version number produced by git describe of the form
@@ -56,7 +50,7 @@ function gitVersion() {
 // 'MAJOR', 'MINOR' and 'PATCH' are taken from the '$TAG' and '$BUILD'
 // is set to the number of commits since the tag
 function buildVersionFromGitVersion(gitVersion) {
-	var gitVersionParts = gitVersion.match(/([0-9\.]+)-([0-9]+)-([^-]+)/);
+	const gitVersionParts = gitVersion.match(/([0-9\.]+)-([0-9]+)-([^-]+)/);
 	if (!gitVersionParts) {
 		throw new Error(gitVersion.toString() + ' is not of the expected form $TAG-$COMMITS_SINCE_TAG-g$HASH');
 	}
