@@ -1,4 +1,16 @@
-# Browser Extension Tools
+# DEPRECATED
+
+For better tools for automated signing (and in some cases publishing) of browser extensions, look at:
+
+For Chrome: [chrome-webstore-upload-cli](https://github.com/DrewML/chrome-webstore-upload-cli)
+
+For Firefox: [web-ext](https://github.com/mozilla/web-ext)
+
+If you know of other tools that you would recommend, please file an issue.
+
+----
+
+## Browser Extension Tools
 
 [![Build Status](https://travis-ci.org/robertknight/extension-tools.png?branch=master)](https://travis-ci.org/robertknight/extension-tools)
 
